@@ -21,9 +21,8 @@ def test_first_1000_frozen_from_independent_algorithm():
     assert PI_FIRST_1000.startswith(PI_FIRST_100)
 
 
-def test_hex_constant_shape():
-    assert len(PI_HEX_FIRST_64) == 64
-    assert set(PI_HEX_FIRST_64) <= set("0123456789ABCDEF")
+def test_hex_constant_matches_decimal_prefix():
+    assert format((int(PI_FIRST_1000) * (16**64)) // (10**1000), "064X") == PI_HEX_FIRST_64
 
 
 def test_terms_and_stable_invariants():
