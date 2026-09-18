@@ -197,7 +197,8 @@ class MainWindow(QMainWindow):
         idle_like = self.state in {"idle", "completed", "stopped"}
         self.new_button.setEnabled(idle_like)
         self.continue_button.setEnabled(idle_like)
-        self.pause_button.setEnabled(running)
+        self.pause_button.setEnabled(running or paused)
+        self.pause_button.setText("继续" if paused else "暂停")
         self.save_button.setEnabled(running or paused)
         self.stop_button.setEnabled(running or paused)
         self.bbp_button.setEnabled(running or paused)
@@ -256,6 +257,10 @@ class MainWindow(QMainWindow):
         self._start_worker(Path(directory), target, resume=True)
 
     def _pause(self) -> None:
+        if self.state == "paused":
+            self._send(protocol.ResumeRunCommand())
+            self.statusBar().showMessage("正在继续…")
+            return
         self._send(protocol.PauseCommand())
 
     def _save_now(self) -> None:
@@ -295,11 +300,17 @@ class MainWindow(QMainWindow):
         if isinstance(event, protocol.ProgressEvent):
             self._on_progress(event)
         elif isinstance(event, protocol.PausedEvent):
-            self.state = "paused"
-            self.rate_panel.set_rate(0.0, self._current_unit())
-            note = "内存超限自动暂停" if event.reason == "memory" else "已暂停"
-            self.statusBar().showMessage(f"{note}：已写 {event.written_digits:,} 位")
+            if event.reason == "stopped":
+                self.state = "stopped"
+                self.worker = None
+                self.statusBar().showMessage(f"已停止并保存：已写 {event.written_digits:,} 位")
+            else:
+                self.state = "paused"
+                self.rate_panel.set_rate(0.0, self._current_unit())
+                note = "内存超限自动暂停" if event.reason == "memory" else "已暂停"
+                self.statusBar().showMessage(f"{note}：已写 {event.written_digits:,} 位")
             self._update_buttons()
+            self._refresh_history()
         elif isinstance(event, protocol.SavedEvent):
             self.statusBar().showMessage(f"已保存 {event.written_digits:,} 位 → {event.path}")
             self._refresh_history()
@@ -324,6 +335,9 @@ class MainWindow(QMainWindow):
             self._append_log(event.level, event.message)
 
     def _on_progress(self, event: protocol.ProgressEvent) -> None:
+        if self.state == "paused":
+            self.state = "running"
+            self._update_buttons()
         if event.chunk_text:
             self.digit_view.append_digits(event.chunk_text)
         target = self.config.target_digits
@@ -461,17 +475,20 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:
         if self.worker is not None and self.worker.is_alive():
-            answer = QMessageBox.question(self, "退出", "计算仍在进行。停止并保存后退出？")
-            if answer != QMessageBox.StandardButton.Yes:
-                event.ignore()
-                return
+            if self.state in {"running", "paused"}:
+                answer = QMessageBox.question(self, "退出", "计算仍在进行。停止并保存后退出？")
+                if answer != QMessageBox.StandardButton.Yes:
+                    event.ignore()
+                    return
             self._send(protocol.StopCommand())
             deadline = time.monotonic() + 20.0
             while self.worker.is_alive() and time.monotonic() < deadline:
                 self._drain_events(limit=1000)
                 QApplication.processEvents()
                 time.sleep(0.05)
-            self.worker.join(timeout=2)
+            if self.worker.is_alive():
+                self.worker.terminate()
+            self.worker.join(timeout=3)
         if self.search_worker is not None:
             self.search_worker.cancel()
             self.search_worker.wait(2000)
