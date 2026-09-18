@@ -3,8 +3,8 @@ from fractions import Fraction
 
 import pytest
 
-from pi_tool.common.constants import DIGITS_PER_TERM, stable_digits_for_terms, terms_for_digits
-from pi_tool.engine.chudnovsky import SeriesState, bs
+from pi_tool.common.constants import terms_for_digits
+from pi_tool.engine.chudnovsky import IDENTITY, SeriesState, bs
 
 
 def _naive_sum(terms: int) -> Fraction:
@@ -40,10 +40,52 @@ def test_chunked_state_equals_single_shot():
     assert (state.triple.p, state.triple.q, state.triple.t) == (reference.p, reference.q, reference.t)
 
 
-def test_terms_and_stable_monotonic():
-    assert terms_for_digits(10000) == int((10000 + 20) / DIGITS_PER_TERM) + 3
-    previous = -1
-    for terms in range(0, 1000, 37):
-        current = stable_digits_for_terms(terms)
-        assert current >= previous
-        previous = current
+def test_many_small_chunks_equal_single_shot():
+    state = SeriesState()
+    for _ in range(200):
+        state.extend(1)
+    reference = bs(0, 200)
+    assert (state.triple.p, state.triple.q, state.triple.t) == (reference.p, reference.q, reference.t)
+
+
+def test_empty_range_is_identity():
+    assert bs(5, 5) == IDENTITY
+    assert bs(0, 0) == IDENTITY
+    state = SeriesState()
+    state.extend(0)
+    state.extend(-10)
+    assert state.terms == 0
+    assert state.triple == IDENTITY
+
+
+def test_reversed_range_and_bad_leaf_cutoff_rejected():
+    with pytest.raises(ValueError):
+        bs(5, 4)
+    with pytest.raises(ValueError):
+        bs(0, 10, leaf_cutoff=0)
+
+
+def test_snapshot_restore_roundtrip():
+    state = SeriesState()
+    for step in (7, 33, 160):
+        state.extend(step)
+    terms, levels = state.snapshot()
+    restored = SeriesState()
+    restored.restore(terms, levels)
+    assert restored.terms == state.terms
+    assert (restored.triple.p, restored.triple.q, restored.triple.t) == (
+        state.triple.p,
+        state.triple.q,
+        state.triple.t,
+    )
+    restored.extend(50)
+    state.extend(50)
+    assert (restored.triple.p, restored.triple.q, restored.triple.t) == (
+        state.triple.p,
+        state.triple.q,
+        state.triple.t,
+    )
+
+
+def test_terms_for_digits_reexport_matches_constants():
+    assert terms_for_digits(10000) == int((10000 + 20) / 14.181647462725477) + 3
