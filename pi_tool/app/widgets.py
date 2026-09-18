@@ -19,10 +19,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..common.config import TARGET_DIGITS_MAX, TARGET_DIGITS_MIN, Config
+from ..common.config import TARGET_DIGITS_MIN, Config
 from .theme import DIGIT_FONT_FAMILIES, DIGIT_FONT_POINT_SIZE
 
 VIEW_MAX_INSERT = 2_000_000
+TARGET_DIGITS_UI_MAX = 2_000_000_000
 
 
 class DigitView(QPlainTextEdit):
@@ -135,7 +136,7 @@ class NewSessionDialog(QDialog):
         self.setWindowTitle("新计算")
         self.setMinimumWidth(520)
         self.target_spin = QSpinBox()
-        self.target_spin.setRange(TARGET_DIGITS_MIN, TARGET_DIGITS_MAX)
+        self.target_spin.setRange(TARGET_DIGITS_MIN, TARGET_DIGITS_UI_MAX)
         self.target_spin.setValue(config.target_digits)
         self.target_spin.setGroupSeparatorShown(True)
         self.output_edit = QLineEdit(config.output_dir)
