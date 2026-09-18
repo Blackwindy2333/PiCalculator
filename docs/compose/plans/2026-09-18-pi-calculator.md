@@ -501,7 +501,7 @@ __all__ = [
 - [ ] **Step 4: 运行测试确认通过**
 
 运行：`.venv\Scripts\python.exe -m pytest tests/test_chudnovsky.py -q`
-预期：`10 passed`（6 个参数化用例 + 4 个独立用例）。
+预期：`9 passed`（6 个参数化用例 + 3 个独立用例）；全量 `pytest tests -q` 预期 `13 passed`。
 
 - [ ] **Step 5: 提交**
 
