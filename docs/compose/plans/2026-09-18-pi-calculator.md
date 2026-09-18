@@ -2756,6 +2756,8 @@ class MainWindow(QMainWindow):
     # ---------- worker 生命周期 ----------
 
     def _start_worker(self, output_dir: Path, target_digits: int, resume: bool) -> None:
+        self.config.target_digits = target_digits
+        self.config.output_dir = str(output_dir)
         self.events = multiprocessing.Queue()
         self.commands = multiprocessing.Queue()
         self.memory_limit_bytes = int(self.config.memory_limit_gb * (1024**3))
