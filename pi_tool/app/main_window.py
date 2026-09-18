@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import multiprocessing
 import queue
+import time
 from pathlib import Path
 
 from PySide6.QtCore import QTimer
@@ -269,17 +270,18 @@ class MainWindow(QMainWindow):
 
     # ---------- 事件轮询 ----------
 
-    def _poll_events(self) -> None:
+    def _drain_events(self, limit: int = 200) -> None:
         if self.events is None:
             return
-        drained = 0
-        while drained < 200:
+        for _ in range(limit):
             try:
                 event = self.events.get_nowait()
             except queue.Empty:
-                break
-            drained += 1
+                return
             self._handle_event(event)
+
+    def _poll_events(self) -> None:
+        self._drain_events()
         if self.worker is not None and self.state in {"running", "paused"} and not self.worker.is_alive():
             self._append_log("error", "计算进程已退出")
             self.worker = None
@@ -464,7 +466,12 @@ class MainWindow(QMainWindow):
                 event.ignore()
                 return
             self._send(protocol.StopCommand())
-            self.worker.join(timeout=20)
+            deadline = time.monotonic() + 20.0
+            while self.worker.is_alive() and time.monotonic() < deadline:
+                self._drain_events(limit=1000)
+                QApplication.processEvents()
+                time.sleep(0.05)
+            self.worker.join(timeout=2)
         if self.search_worker is not None:
             self.search_worker.cancel()
             self.search_worker.wait(2000)
