@@ -212,7 +212,7 @@ from tests.machin_ref import pi_digits_machin
 
 def test_first_100_matches_canonical_value():
     assert PI_FIRST_100 == pi_digits_machin(100)[1:]
-    assert PI_FIRST_100.startswith(format(math.pi, ".16f")[2:])
+    assert PI_FIRST_100.startswith(format(math.pi, ".15f")[2:])
 
 
 def test_first_1000_frozen_from_independent_algorithm():
