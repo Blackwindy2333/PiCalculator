@@ -79,6 +79,7 @@ class DigitFile:
     def open(self, resume_written: int | None) -> int:
         if resume_written is None or not self.path.exists():
             self.handle = open(self.path, "wb")
+            self.handle.write(b"3.")
             self.written_digits = 0
             return 0
         stream_length = 2 + resume_written
@@ -88,6 +89,7 @@ class DigitFile:
         if size < expected_bytes:
             self.handle.truncate(0)
             self.handle.seek(0)
+            self.handle.write(b"3.")
             self.written_digits = 0
             return 0
         self.handle.truncate(expected_bytes)
@@ -429,6 +431,9 @@ class Calculator:
             self.events.put(ErrorEvent(message="完成后自检失败：前 100 位与权威常数不符"))
         self.sha256_final = sha256_file(self.digit_file.path)
         self.status = "completed"
+        checkpoint_module.save(
+            self.checkpoint_path, self.state, stable_digits_for_terms(self.state.terms), self.snapshot_config()
+        )
         self.persist_session("completed")
         self.maybe_emit_progress(force=True)
         self.events.put(DoneEvent(total_digits=self.digit_file.written_digits, sha256=self.sha256_final))
@@ -529,8 +534,8 @@ def _cli(argv: list[str] | None = None) -> int:
     parser.add_argument("--autosave-interval", type=float, default=300.0)
     parser.add_argument("--memory-limit-gb", type=float, default=8.0)
     args = parser.parse_args(argv)
-    events = multiprocessing.Queue()
-    commands = multiprocessing.Queue()
+    events: queue.Queue = queue.Queue()
+    commands: queue.Queue = queue.Queue()
     run_calculator(
         events,
         commands,
