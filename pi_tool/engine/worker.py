@@ -368,6 +368,7 @@ class Calculator:
             if isinstance(command, StopCommand):
                 self.status = "stopped"
                 self.persist_session("stopped")
+                self.events.put(PausedEvent(reason="stopped", written_digits=self.digit_file.written_digits))
                 self.emit_log("info", "已停止（进度已保存，可随时继续）")
                 return "stop"
             if isinstance(command, SaveCommand):
@@ -389,6 +390,7 @@ class Calculator:
             self.pause_and_save()
             self.status = "stopped"
             self.persist_session("stopped")
+            self.events.put(PausedEvent(reason="stopped", written_digits=self.digit_file.written_digits))
             return "stop"
         if isinstance(command, SaveCommand):
             self.append_stable_digits()
@@ -478,6 +480,10 @@ def run_calculator(
 ) -> None:
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    for channel in (events, commands):
+        cancel_join = getattr(channel, "cancel_join_thread", None)
+        if cancel_join is not None:
+            cancel_join()
     calculator = Calculator(
         events, output_dir, target_digits, refresh_interval_s, autosave_interval_s, memory_limit_bytes
     )
